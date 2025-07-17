@@ -1,12 +1,10 @@
-name: Accurate Java Method Diff with GumTree
+name: method-diff
 
 on:
   push:
     paths:
       - 'Calculator.java'
-  pull_request:
-    paths:
-      - 'Calculator.java'
+  workflow_dispatch:
 
 jobs:
   method-diff:
@@ -14,66 +12,31 @@ jobs:
 
     steps:
       - name: Checkout Code with History
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # full history needed for comparing commits
+          fetch-depth: 0  # Needed for full history and diffs
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'
           java-version: '17'
-
-      - name: Install GumTree
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y maven git unzip
-          git clone https://github.com/GumTreeDiff/gumtree.git
-          cd gumtree
-          mvn clean install -DskipTests
-          echo "$GITHUB_WORKSPACE/gumtree/cli/target" >> $GITHUB_PATH
+          distribution: 'temurin'
 
       - name: Save previous and current versions of Calculator.java
         run: |
-          mkdir versions
-          git show HEAD~1:Calculator.java > versions/old.java
-          cp Calculator.java versions/new.java
+          git show HEAD~1:Calculator.java > Calculator_Old.java
+          cp Calculator.java Calculator.java
+
+      - name: Download GumTree CLI
+        run: |
+          wget https://github.com/GumTreeDiff/gumtree/releases/download/v2.1.1/gumtree-2.1.1.jar -O gumtree.jar
 
       - name: Run GumTree Diff
         run: |
-          cd versions
-          java -jar ../gumtree/cli/target/gumtree-cli-*.jar textdiff old.java new.java > method.diff
-          cat method.diff
+          java -jar gumtree.jar textdiff Calculator_Old.java Calculator.java > gumtree-diff.txt
+          cat gumtree-diff.txt
 
       - name: Simulate Test Based on GumTree Output
         run: |
-          cd versions
-          FOUND=false
-
-          if grep -q 'add(' method.diff; then
-            echo "Detected change in 'add' method"
-            echo "Running sample test for add: 2 + 3 = $((2 + 3))"
-            FOUND=true
-          fi
-
-          if grep -q 'subtract(' method.diff; then
-            echo "Detected change in 'subtract' method"
-            echo "Running sample test for subtract: 5 - 2 = $((5 - 2))"
-            FOUND=true
-          fi
-
-          if grep -q 'multiply(' method.diff; then
-            echo "Detected change in 'multiply' method"
-            echo "Running sample test for multiply: 3 * 4 = $((3 * 4))"
-            FOUND=true
-          fi
-
-          if grep -q 'divide(' method.diff; then
-            echo "Detected change in 'divide' method"
-            echo "Running sample test for divide: 10 / 2 = $((10 / 2))"
-            FOUND=true
-          fi
-
-          if [ "$FOUND" = false ]; then
-            echo "No method changes detected by GumTree."
-          fi
+          echo "Simulated test based on method changes detected by GumTree"
+          # You can add test logic here later based on diff output
